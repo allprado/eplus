@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPlus 3D Modeler</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-cube"></i>
+                    <span>EPlus 3D Modeler</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="toolbar">
+                    <button id="btn-select" class="tool-btn active" title="Selecionar (S)">
+                        <i class="fas fa-mouse-pointer"></i>
+                    </button>
+                    <button id="btn-orbit" class="tool-btn" title="Órbita (O)">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button id="btn-pan" class="tool-btn" title="Pan (P)">
+                        <i class="fas fa-arrows-alt"></i>
+                    </button>
+                    <button id="btn-zoom" class="tool-btn" title="Zoom (Z)">
+                        <i class="fas fa-search-plus"></i>
+                    </button>
+                    <div class="separator"></div>
+                    <button id="btn-reset-view" class="tool-btn" title="Resetar Vista">
+                        <i class="fas fa-home"></i>
+                    </button>
+                    <button id="btn-north" class="tool-btn" title="Orientação Norte">
+                        <i class="fas fa-compass"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="btn-save" class="action-btn">
+                    <i class="fas fa-save"></i>
+                    Salvar
+                </button>
+                <button id="btn-load" class="action-btn">
+                    <i class="fas fa-folder-open"></i>
+                    Carregar
+                </button>
+                <button id="btn-export-idf" class="action-btn primary">
+                    <i class="fas fa-download"></i>
+                    Exportar IDF
+                </button>
+                <button id="btn-simulate" class="action-btn success">
+                    <i class="fas fa-play"></i>
+                    Simular
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel - Project Tree -->
+            <aside class="left-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-sitemap"></i> Hierarquia do Projeto</h3>
+                </div>
+                <div class="tree-container">
+                    <div id="project-tree" class="project-tree">
+                        <!-- Tree will be populated by JavaScript -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 3D Viewport -->
+            <main class="viewport">
+                <div id="canvas-container" class="canvas-container">
+                    <canvas id="threejs-canvas"></canvas>
+                    
+                    <!-- Viewport Overlays -->
+                    <div class="viewport-overlays">
+                        <!-- Coordinate System -->
+                        <div class="coordinate-system">
+                            <div class="axis axis-x">X</div>
+                            <div class="axis axis-y">Y</div>
+                            <div class="axis axis-z">Z</div>
+                        </div>
+                        
+                        <!-- North Indicator -->
+                        <div class="north-indicator">
+                            <div class="compass">
+                                <i class="fas fa-location-arrow"></i>
+                                <span>N</span>
+                            </div>
+                        </div>
+                        
+                        <!-- View Controls -->
+                        <div class="view-controls">
+                            <button class="view-btn" id="view-top">Top</button>
+                            <button class="view-btn" id="view-front">Front</button>
+                            <button class="view-btn" id="view-right">Right</button>
+                            <button class="view-btn" id="view-iso">ISO</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Panel - Properties -->
+            <aside class="right-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-cog"></i> Propriedades</h3>
+                </div>
+                <div class="properties-container">
+                    <div id="properties-panel" class="properties-panel">
+                        <div class="no-selection">
+                            <i class="fas fa-mouse-pointer"></i>
+                            <p>Selecione um elemento para editar suas propriedades</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <span id="selection-info">Nenhum elemento selecionado</span>
+            </div>
+            <div class="status-center">
+                <span id="coordinates">X: 0.00 Y: 0.00 Z: 0.00</span>
+            </div>
+            <div class="status-right">
+                <span id="view-mode">Vista Perspectiva</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Hidden File Inputs -->
+    <input type="file" id="file-input" accept=".json" style="display: none;">
+    
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loader">
+            <i class="fas fa-cube fa-spin"></i>
+            <p>Carregando EPlus 3D Modeler...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r158/three.min.js"></script>
+    <script>
+        // Verificar carregamento do THREE.js
+        function waitForTHREE() {
+            return new Promise((resolve) => {
+                if (typeof THREE !== 'undefined') {
+                    resolve();
+                } else {
+                    setTimeout(() => {
+                        waitForTHREE().then(resolve);
+                    }, 100);
+                }
+            });
+        }
+
+        // Carregar OrbitControls localmente
+        function loadOrbitControls() {
+            return new Promise((resolve, reject) => {
+                if (typeof THREE === 'undefined') {
+                    reject(new Error('THREE.js não está disponível'));
+                    return;
+                }
+
+                // Implementação básica do OrbitControls
+                THREE.OrbitControls = function(object, domElement) {
+                    this.object = object;
+                    this.domElement = domElement || document;
+                    this.enabled = true;
+                    this.target = new THREE.Vector3();
+                    this.enableDamping = false;
+                    this.dampingFactor = 0.25;
+                    this.enableZoom = true;
+                    this.enableRotate = true;
+                    this.enablePan = true;
+                    this.screenSpacePanning = false;
+                    this.minDistance = 0;
+                    this.maxDistance = Infinity;
+                    this.maxPolarAngle = Math.PI;
+                    this.rotateSpeed = 1.0;
+
+                    const scope = this;
+                    const spherical = new THREE.Spherical();
+                    const sphericalDelta = new THREE.Spherical();
+                    let scale = 1;
+
+                    this.update = function() {
+                        const offset = new THREE.Vector3();
+                        const position = object.position;
+                        
+                        offset.copy(position).sub(scope.target);
+                        spherical.setFromVector3(offset);
+                        spherical.theta += sphericalDelta.theta;
+                        spherical.phi += sphericalDelta.phi;
+                        spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+                        spherical.radius *= scale;
+                        spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius));
+                        
+                        offset.setFromSpherical(spherical);
+                        position.copy(scope.target).add(offset);
+                        object.lookAt(scope.target);
+                        
+                        sphericalDelta.set(0, 0, 0);
+                        scale = 1;
+                        
+                        return true;
+                    };
+
+                    // Eventos básicos de mouse
+                    let mouseButtons = { LEFT: 0, MIDDLE: 1, RIGHT: 2 };
+                    let state = 'NONE';
+                    let rotateStart = new THREE.Vector2();
+                    let rotateEnd = new THREE.Vector2();
+
+                    function onMouseDown(event) {
+                        if (!scope.enabled) return;
+                        event.preventDefault();
+                        
+                        if (event.button === mouseButtons.LEFT) {
+                            state = 'ROTATE';
+                            rotateStart.set(event.clientX, event.clientY);
+                        }
+                        
+                        document.addEventListener('mousemove', onMouseMove);
+                        document.addEventListener('mouseup', onMouseUp);
+                    }
+
+                    function onMouseMove(event) {
+                        if (!scope.enabled) return;
+                        event.preventDefault();
+                        
+                        if (state === 'ROTATE') {
+                            rotateEnd.set(event.clientX, event.clientY);
+                            const rotateDelta = new THREE.Vector2().subVectors(rotateEnd, rotateStart).multiplyScalar(scope.rotateSpeed);
+                            sphericalDelta.theta -= 2 * Math.PI * rotateDelta.x / scope.domElement.clientHeight;
+                            sphericalDelta.phi -= 2 * Math.PI * rotateDelta.y / scope.domElement.clientHeight;
+                            rotateStart.copy(rotateEnd);
+                        }
+                    }
+
+                    function onMouseUp() {
+                        if (!scope.enabled) return;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        state = 'NONE';
+                    }
+
+                    function onMouseWheel(event) {
+                        if (!scope.enabled || !scope.enableZoom) return;
+                        event.preventDefault();
+                        if (event.deltaY < 0) {
+                            scale /= 0.95;
+                        } else {
+                            scale *= 0.95;
+                        }
+                    }
+
+                    this.domElement.addEventListener('mousedown', onMouseDown);
+                    this.domElement.addEventListener('wheel', onMouseWheel);
+                    this.update();
+                };
+
+                resolve();
+            });
+        }
+
+        // Carregar scripts em sequência
+        async function loadScripts() {
+            const scripts = [
+                'js/config.js',
+                'js/geometry.js',
+                'js/scene.js', 
+                'js/ui.js',
+                'js/export.js',
+                'js/simulation.js',
+                'js/app.js'
+            ];
+
+            for (const src of scripts) {
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error(`Erro ao carregar ${src}`));
+                    document.head.appendChild(script);
+                });
+            }
+        }
+
+        // Inicialização principal
+        async function init() {
+            try {
+                console.log('Aguardando THREE.js...');
+                await waitForTHREE();
+                console.log('THREE.js disponível, versão:', THREE.REVISION);
+                
+                console.log('Carregando OrbitControls...');
+                await loadOrbitControls();
+                console.log('OrbitControls carregado');
+                
+                console.log('Carregando scripts da aplicação...');
+                await loadScripts();
+                console.log('Scripts carregados');
+                
+                if (window.initEPlusApp) {
+                    console.log('Inicializando aplicação...');
+                    window.initEPlusApp();
+                } else {
+                    console.error('Função initEPlusApp não encontrada');
+                }
+            } catch (error) {
+                console.error('Erro na inicialização:', error);
+                alert('Erro ao carregar a aplicação: ' + error.message);
+            }
+        }
+
+        // Iniciar quando a página carregar
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
